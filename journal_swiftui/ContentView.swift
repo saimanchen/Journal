@@ -1,21 +1,23 @@
-//
-//  ContentView.swift
-//  journal_swiftui
-//
-//  Created by Saiman Chen on 2022-10-04.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    var journal = Journal()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundColor(.accentColor)
-            Text("Hello, world!")
+        ZStack {
+            VStack {
+                Text("My Journal")
+                    .font(.title)
+                    .bold()
+                List() {
+                    ForEach(journal.getAllEntries()) {
+                        entry in
+                        
+                        Text(entry.title)
+                    }
+                }
+            }
         }
-        .padding()
     }
 }
 
