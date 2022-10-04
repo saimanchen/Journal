@@ -1,7 +1,7 @@
 import Foundation
 
-class Journal {
-    private var entries = [JournalEntry]()
+class Journal: ObservableObject {
+    @Published private var entries = [JournalEntry]()
     
     func addEntry(entry: JournalEntry) {
         entries.append(entry)
