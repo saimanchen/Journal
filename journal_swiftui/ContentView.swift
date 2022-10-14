@@ -1,60 +1,143 @@
 import SwiftUI
 
+// MARK: ContentView
 struct ContentView: View {
-    @StateObject var journal = Journal()
-    @State var showPopUp: Bool = false
+    @StateObject var databaseConnection = DatabaseConnection()
+    @State var showPopup = false
     
     var body: some View {
         ZStack {
-            MainContentView(journal: journal, showPopUp: $showPopUp)
-            
-            if showPopUp {
-                PopUpView(journal: journal, showPopUp: $showPopUp)
+            if databaseConnection.userLoggedIn {
+                MainContentView(databaseConnection: databaseConnection, showPopup: $showPopup)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationTitle("Journal")
+                    .toolbar {
+                        ToolbarItem(placement: .automatic, content: {
+                            Text("+")
+                                .font(.system(size: 32))
+                                .onTapGesture {
+                                    withAnimation {
+                                        showPopup = true
+                                    }
+                                }
+                        })
+                    }
+            } else {
+                LoginView(databaseConnection: databaseConnection)
             }
-           
         }
     }
 }
 
-
+// MARK: MainContentView
 struct MainContentView: View {
-    @ObservedObject var journal: Journal
-    @Binding var showPopUp: Bool
-    @State var isAnimated: Bool = false
+    @ObservedObject var databaseConnection: DatabaseConnection
+    @Binding var showPopup: Bool
+    
+    var body: some View {
+        ZStack {
+            if let userDocument = databaseConnection.userDocument {
+                List() {
+                    ForEach(userDocument.entries) {
+                        entry in
+                        
+                        Text(entry.title)
+                    }
+                }
+            }
+            if showPopup {
+                PopUpView(databaseConnection: databaseConnection, showPopUp: $showPopup)
+            }
+        }
+    }
+}
+
+// MARK: LoginView
+struct LoginView: View {
+    @ObservedObject var databaseConnection: DatabaseConnection
+    @State var email = ""
+    @State var password = ""
+    @State var confirmPassword = ""
     
     var body: some View {
         VStack {
-            Text("My Journal")
-                .font(.title)
-                .bold()
-                .opacity(showPopUp ? 0 : 1)
-            List() {
-                ForEach(journal.getAllEntries()) {
-                    entry in
-                    
-                    Text(entry.title)
-                }
-            }.listStyle(.plain)
-            Button("Add Entry") {
-                withAnimation(.default) {
-                    isAnimated.toggle()
-                    showPopUp = true
-                }
+            Text("Login").font(.largeTitle)
+            VStack(alignment: .leading) {
+                Text("Email")
+                TextField("", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                Text("Password")
+                SecureField("", text: $password)
+                    .textFieldStyle(.roundedBorder)
+            }.padding()
+            HStack {
+                Button(action: {
+                    if email != "" || password != "" {
+                        databaseConnection.loginUser(email: email, password: password)
+                    }
+                }, label: {
+                    Text("Login")
+                        .frame(width: 150)
+                        .padding()
+                        .background(.gray)
+                        .foregroundColor(.black)
+                        .cornerRadius(3)
+                })
+                NavigationLink(destination: RegisterView(
+                    databaseConnection: databaseConnection), label: {
+                        Text("Register")
+                            .frame(width: 150)
+                            .padding()
+                            .background(.gray)
+                            .foregroundColor(.black)
+                            .cornerRadius(3)
+                    })
             }
-            .padding()
-            .frame(width: 200, height: 50, alignment: .center)
-            .background(.brown)
-            .foregroundColor(.white)
-            .cornerRadius(7)
-            .opacity(showPopUp ? 0 : 1)
-            
-            Spacer()
         }
     }
 }
 
+// MARK: RegisterView
+struct RegisterView: View {
+    @ObservedObject var databaseConnection: DatabaseConnection
+    
+    @State var email = ""
+    @State var password = ""
+    @State var confirmPassword = ""
+    var body: some View {
+        VStack {
+            Text("Register").font(.largeTitle)
+            VStack(alignment: .leading) {
+                Text("Email")
+                TextField("", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                Text("Password")
+                SecureField("", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                Text("Confirm password")
+                SecureField("", text: $confirmPassword)
+                    .textFieldStyle(.roundedBorder)
+            }.padding()
+            
+            Button(action: {
+                if email != "" && password == confirmPassword {
+                    databaseConnection.registerUser(email: email, password: password)
+                }
+            }, label: {
+                Text("Register")
+                    .frame(width: 200)
+                    .padding()
+                    .background(.gray)
+                    .foregroundColor(.black)
+                    .cornerRadius(3)
+            })
+        }
+    }
+}
+
+// MARK: PopupView
 struct PopUpView: View {
-    @ObservedObject var journal: Journal
+    @ObservedObject var databaseConnection: DatabaseConnection
     @Binding var showPopUp: Bool
     @State var title = ""
     @State var content = ""
@@ -74,7 +157,6 @@ struct PopUpView: View {
                         width: UIScreen.main.bounds.width * 0.80
                     )
                     .textFieldStyle(.roundedBorder)
-                    .foregroundColor(.brown)
                 Text("Content")
                 
                 TextEditor(text: $content)
@@ -83,36 +165,41 @@ struct PopUpView: View {
                         height: UIScreen.main.bounds.height * 0.40
                     )
                     .cornerRadius(4)
-                    .foregroundColor(.brown)
             }
             
             Spacer()
-            
-            Button(action: {
-                withAnimation(.default) {
-                    isAnimated.toggle()
-                    if title == "" || content == "" {
-                                       return
-                                   }
-                                   
-                    journal.addEntry(entry: JournalEntry(title: title, content: content, date: Date()))
-                                   
-                    showPopUp = false
-                }
-               
-            }, label: {
-                Text("Save")
-            }).padding().background(.white).foregroundColor(.brown).cornerRadius(7)
-            
-            Button(action: {
-                withAnimation() {
-                    isAnimated.toggle()
-                    showPopUp = false
-                }
-                
-            }, label: {
-                Text("Cancel")
-            })
+            HStack {
+                Button(action: {
+                    withAnimation(.default) {
+                        isAnimated.toggle()
+                        if title == "" || content == "" {
+                            return
+                        }
+                        databaseConnection.addEntryToDatabase(entry: JournalEntry(title: title, content: content, date: Date()))
+                        
+                        showPopUp = false
+                    }
+                }, label: {
+                    Text("Save")
+                })
+                .frame(width: 150, height: 40)
+                .background(.gray)
+                .foregroundColor(.white)
+                .cornerRadius(3)
+
+                Button(action: {
+                    withAnimation() {
+                        isAnimated.toggle()
+                        showPopUp = false
+                    }
+                }, label: {
+                    Text("Cancel")
+                })
+                .frame(width: 80, height: 40)
+                .background(.white)
+                .foregroundColor(.gray)
+                .cornerRadius(3)
+            }
             
             Spacer()
         }
@@ -128,8 +215,10 @@ struct PopUpView: View {
     }
 }
 
+// MARK: Preview
 struct ContentView_Previews: PreviewProvider {
+    @Binding var showPopUp: Bool
     static var previews: some View {
-        ContentView()
+        MainContentView(databaseConnection: DatabaseConnection(), showPopup: .constant(true))
     }
 }
